@@ -26,8 +26,8 @@ tokio = { version = "1.44.2", features = ["full"] }
 diesel = { version = "2.2.10", features = ["postgres", "chrono", "r2d2"] }
 diesel_migrations = { version = "2.2.0", features = ["postgres"] }
 chrono = "0.4"
-zenth_dto = { path = "../zenth_dto" }
-zenth_crypto = { path = "../zenth_crate_crypto" }
+zenth_dto = { git = "https://github.com/ZenthProject/zenth_dto.git" }
+zenth_crypto = { git = "https://github.com/ZenthProject/zenth_crypto.git" }
 prost = "0.14.1"
 aucpace = "0.1.1"
 rand = "0.8"
