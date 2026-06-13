@@ -109,8 +109,39 @@ pub fn send_message(
             Content::RegularMessage(msg) => msg.encode_to_vec(),
         },
         None => vec![],
-    };                                                                                                                                                        
-                                                                                                                                                                
+    };
+
+    // Rate limit par palier de taille (le serveur voit les octets chiffrés, pas le contenu).
+    const MID_THRESHOLD:   usize = 1024 * 1024;       // 1 Mo  — en dessous : pas de limite
+    const LARGE_THRESHOLD: usize = 10 * 1024 * 1024;  // 10 Mo — palier moyen
+    const MAX_THRESHOLD:   usize = 25 * 1024 * 1024;  // 25 Mo — refusé au-dessus
+
+    let size = content_bytes.len();
+    if size > MAX_THRESHOLD {
+        return Ok(SendMessageResponse {
+            success: false,
+            message_id: vec![],
+            server_timestamp: 0,
+            error_message: "Fichier trop volumineux : maximum 25 Mo par message (utilisez le transfert P2P pour les fichiers plus grands)".to_string(),
+        });
+    }
+    if size > LARGE_THRESHOLD && !crate::rate_limit::large_msg_allowed(&envelope.sender_hash_id) {
+        return Ok(SendMessageResponse {
+            success: false,
+            message_id: vec![],
+            server_timestamp: 0,
+            error_message: "Limite dépassée : 1 fichier > 10 Mo autorisé par 30 secondes".to_string(),
+        });
+    }
+    if size > MID_THRESHOLD && !crate::rate_limit::mid_msg_allowed(&envelope.sender_hash_id) {
+        return Ok(SendMessageResponse {
+            success: false,
+            message_id: vec![],
+            server_timestamp: 0,
+            error_message: "Limite dépassée : 1 fichier > 1 Mo autorisé par 10 secondes".to_string(),
+        });
+    }
+
     // sequence_number transporte le TTL souhaité par l'expéditeur (0 = jamais).
     let expires_at = if envelope.sequence_number == 0 {
         // Pas d'expiration : on utilise une date très lointaine (year 9999).

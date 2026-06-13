@@ -3,7 +3,6 @@ use crate::db::establish_connection;
 use crate::models::{NewOneTimePrekey, User};
 use crate::schema::{one_time_prekeys, users};
 use diesel::prelude::*;
-use prost::Message;
 use zenth_dto::{UploadPreKeysRequest, UploadPreKeysResponse};
 
 pub async fn upload_prekeys(req: UploadPreKeysRequest) -> Result<UploadPreKeysResponse, String> {

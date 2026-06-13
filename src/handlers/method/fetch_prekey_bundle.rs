@@ -4,7 +4,7 @@ use crate::models::User;
 use crate::schema::{users, one_time_prekeys};
 use diesel::prelude::*;
 use prost::Message;
-use zenth_dto::{FetchPreKeyBundleRequest, FetchPreKeyBundleResponse, PreKeyBundle, PreKey};
+use zenth_dto::{FetchPreKeyBundleRequest, FetchPreKeyBundleResponse, PreKeyBundle};
 
 pub async fn fetch_prekey_bundle(req: FetchPreKeyBundleRequest) -> Result<FetchPreKeyBundleResponse, String> {
 

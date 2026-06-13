@@ -10,6 +10,14 @@ const RELAY_PUSH_WINDOW: u64 = 60;
 const BLOB_PUSH_MAX: u32   = 20;
 const BLOB_PUSH_WINDOW: u64 = 60;
 
+// Fichiers moyens (1 Mo < taille ≤ 10 Mo) : 1 par 10 secondes par expéditeur
+const MID_MSG_MAX: u32    = 1;
+const MID_MSG_WINDOW: u64 = 10;
+
+// Gros fichiers (10 Mo < taille ≤ 25 Mo) : 1 par 30 secondes par expéditeur
+const LARGE_MSG_MAX: u32    = 1;
+const LARGE_MSG_WINDOW: u64 = 30;
+
 pub struct KeyRateLimiter {
     // Clé : 32 premiers octets de la pubkey Dilithium (évite de stocker 1312 bytes)
     map: Mutex<HashMap<[u8; 32], (Instant, u32)>>,
@@ -60,6 +68,8 @@ impl KeyRateLimiter {
 
 static RELAY_PUSH_LIMITER: OnceLock<KeyRateLimiter> = OnceLock::new();
 static BLOB_PUSH_LIMITER:  OnceLock<KeyRateLimiter> = OnceLock::new();
+static MID_MSG_LIMITER:    OnceLock<KeyRateLimiter> = OnceLock::new();
+static LARGE_MSG_LIMITER:  OnceLock<KeyRateLimiter> = OnceLock::new();
 
 pub fn init_limiters() {
     RELAY_PUSH_LIMITER
@@ -67,6 +77,12 @@ pub fn init_limiters() {
         .ok();
     BLOB_PUSH_LIMITER
         .set(KeyRateLimiter::new(BLOB_PUSH_MAX, BLOB_PUSH_WINDOW))
+        .ok();
+    MID_MSG_LIMITER
+        .set(KeyRateLimiter::new(MID_MSG_MAX, MID_MSG_WINDOW))
+        .ok();
+    LARGE_MSG_LIMITER
+        .set(KeyRateLimiter::new(LARGE_MSG_MAX, LARGE_MSG_WINDOW))
         .ok();
 }
 
@@ -86,8 +102,26 @@ pub fn blob_push_allowed(sender_key: &[u8]) -> bool {
         .unwrap_or(true)
 }
 
-/// Nettoyage périodique des deux limiters.
+/// Vérifie le rate limit pour les fichiers moyens (1 Mo < taille ≤ 10 Mo). Clé = sender_hash_id.
+pub fn mid_msg_allowed(sender_key: &[u8]) -> bool {
+    MID_MSG_LIMITER
+        .get()
+        .map(|l| l.is_allowed(sender_key))
+        .unwrap_or(true)
+}
+
+/// Vérifie le rate limit pour les gros fichiers (10 Mo < taille ≤ 25 Mo). Clé = sender_hash_id.
+pub fn large_msg_allowed(sender_key: &[u8]) -> bool {
+    LARGE_MSG_LIMITER
+        .get()
+        .map(|l| l.is_allowed(sender_key))
+        .unwrap_or(true)
+}
+
+/// Nettoyage périodique des limiters.
 pub fn cleanup_all() {
     if let Some(l) = RELAY_PUSH_LIMITER.get() { l.cleanup(); }
     if let Some(l) = BLOB_PUSH_LIMITER.get()  { l.cleanup(); }
+    if let Some(l) = MID_MSG_LIMITER.get()    { l.cleanup(); }
+    if let Some(l) = LARGE_MSG_LIMITER.get()  { l.cleanup(); }
 }

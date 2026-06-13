@@ -77,8 +77,8 @@ async fn main() {
             tokio::time::sleep(std::time::Duration::from_secs(300)).await;
             tick += 1;
 
-            // Nettoyage des rate limiters toutes les 5 minutes
             crate::rate_limit::cleanup_all();
+            crate::websocket::file_relay::cleanup_expired().await;
 
             // Nettoyage des entrées expirées toutes les heures (12 × 5 min)
             if tick % 12 == 0 {
@@ -121,6 +121,9 @@ async fn main() {
     // Initialiser le manager global pour accès depuis send_message
     init_global(connection_manager.clone());
 
+    // Initialiser le registre P2P file relay (en RAM)
+    websocket::file_relay::init();
+
     let rustfs_base_url = env::var("RUSTFS_BASE_URL")
         .expect("RUSTFS_BASE_URL must be set (ex: https://rustfs.example.com/zenth-updates)");
 
@@ -133,7 +136,7 @@ async fn main() {
     let app = Router::new()
         .route("/", axum::routing::post(handle_post).get(handle_ws_upgrade))
         .fallback(fallback_handler)
-        .layer(DefaultBodyLimit::max(512 * 1024)) // 512 KB
+        .layer(DefaultBodyLimit::max(52 * 1024 * 1024)) // 52 MB (50 MB fichier + overhead protobuf)
         .with_state(app_state.clone());
 
     let addr: SocketAddr = format!("{}:{}", host, port).parse().expect("Invalid address");
