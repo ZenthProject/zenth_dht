@@ -1,0 +1,41 @@
+# Rust
+/target
+Cargo.lock
+
+# Environnement
+.env
+.env.*
+!.env.example
+
+# Certificats TLS
+certs/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Clés privées
+*_private.pem
+*_secret.*
+ed25519_private.pem
+
+# Base de données locale
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editeurs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

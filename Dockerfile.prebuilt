@@ -1,0 +1,37 @@
+# ============================================================
+# Dockerfile.prebuilt — Image runtime à partir d'un binaire pré-compilé
+#
+# Usage :
+#   cargo build --release
+#   docker build -f Dockerfile.prebuilt -t zenth_dht:latest .
+#
+# Le binaire doit être compilé sur la même architecture glibc que
+# debian:bookworm-slim (glibc 2.36) pour éviter les erreurs de symboles.
+# ============================================================
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpq5 \
+        ca-certificates \
+        tini \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r -g 1001 appgroup \
+    && useradd -r -u 1001 -g appgroup \
+       -M -s /sbin/nologin appuser
+
+WORKDIR /app
+RUN chown appuser:appgroup /app
+
+COPY --chown=appuser:appgroup target/release/zenth-dht /app/zenth-dht
+RUN chmod 500 /app/zenth-dht
+
+USER appuser
+
+ENV RUST_LOG=info \
+    PGSSLMODE=require
+
+EXPOSE 8081
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["/app/zenth-dht"]

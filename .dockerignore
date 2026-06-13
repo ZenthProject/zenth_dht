@@ -1,0 +1,20 @@
+# Artefacts de build Rust — souvent plusieurs Go
+target/
+# Exception : binaire release nécessaire pour Dockerfile.prebuilt
+!target/release/zenth-dht
+
+# Historique git inutile dans le contexte Docker
+.git/
+
+# Binaire diesel_cli local (plus nécessaire, compilé dans Docker)
+diesel
+
+# Fichiers d'environnement sensibles
+.env
+.env.*
+
+# Fichiers de dev locaux non nécessaires à l'image
+docker-compose.yml
+Makefile
+k8s-deployment.yaml
+*.md

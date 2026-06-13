@@ -1,0 +1,47 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: zenth
+      POSTGRES_PASSWORD: zenth_secret
+      POSTGRES_DB: zenth_dht
+    # Port local changé en 5433 pour éviter le conflit
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zenth -d zenth_dht"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrations:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrations
+    environment:
+      DATABASE_URL: postgres://zenth:zenth_secret@postgres/zenth_dht?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://zenth:zenth_secret@postgres/zenth_dht?sslmode=disable
+      RUST_LOG: debug
+      PGSSLMODE: disable
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+
+volumes:
+  pg_data:

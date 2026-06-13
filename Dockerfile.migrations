@@ -1,0 +1,42 @@
+# ============================================================
+# Stage 1 — Builder : compile diesel_cli dans Docker
+# Plus besoin du binaire diesel sur le host.
+# ============================================================
+FROM rust:1-slim-bookworm AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        pkg-config \
+        libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN cargo install diesel_cli --no-default-features --features postgres
+
+# ============================================================
+# Stage 2 — Image migrations (init container Kubernetes)
+# ============================================================
+FROM alpine:3.21
+
+RUN apk add --no-cache \
+        gcompat \
+        libgcc \
+        libpq \
+        ca-certificates
+
+RUN addgroup -S -g 1001 appgroup \
+    && adduser -S -u 1001 -G appgroup \
+       -H -s /sbin/nologin appuser
+
+WORKDIR /app
+RUN chown appuser:appgroup /app
+
+COPY --from=builder --chown=appuser:appgroup /usr/local/cargo/bin/diesel /app/diesel
+RUN chmod 500 /app/diesel
+
+COPY --chown=appuser:appgroup migrations/ /app/migrations/
+
+USER appuser
+
+ENV PGSSLMODE=require
+
+# Lance les migrations et s'arrête — parfait pour un init container
+CMD ["/app/diesel", "migration", "run", "--migration-dir", "/app/migrations"]

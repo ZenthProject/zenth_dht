@@ -1,0 +1,109 @@
+# ============================================================
+# Kubernetes — Deployment + init container migrations
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zenth-dht
+  labels:
+    app: zenth-dht
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: zenth-dht
+  template:
+    metadata:
+      labels:
+        app: zenth-dht
+    spec:
+      # ── Sécurité pod ─────────────────────────────────────
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+
+      # ── Init container : migrations ───────────────────────
+      initContainers:
+        - name: migrations
+          image: ghcr.io/ton-org/zenth_dht-migrations:latest  # ← adapte
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: zenth-dht-secrets
+                  key: database-url
+
+      # ── Container principal ───────────────────────────────
+      containers:
+        - name: zenth-dht
+          image: ghcr.io/ton-org/zenth_dht:latest  # ← adapte
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: zenth-dht-secrets
+                  key: database-url
+            - name: RUST_LOG
+              value: "info"
+            - name: PGSSLMODE
+              value: "require"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+---
+# ── Secret (à créer via kubectl, jamais commit en clair) ─────
+# kubectl create secret generic zenth-dht-secrets \
+#   --from-literal=database-url='postgres://user:pass@host/db?sslmode=require'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: zenth-dht-secrets
+type: Opaque
+# data: géré par kubectl ou un secret manager (Vault, Sealed Secrets…)
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zenth-dht
+spec:
+  selector:
+    app: zenth-dht
+  ports:
+    - port: 80
+      targetPort: 3000
